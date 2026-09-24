@@ -1,0 +1,20 @@
+{
+  "name": "EventDevX",
+  "short_name": "EventDevX",
+  "description": "EventDevX - Premium Community Infrastructure Platform",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#070b16",
+  "theme_color": "#6366f1",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "lang": "en",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

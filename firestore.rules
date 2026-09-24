@@ -1,0 +1,261 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /* =========================================================
+       HELPERS
+       ========================================================= */
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function accessRecord() {
+      return get(
+        /databases/$(database)/documents/admins/$(request.auth.uid)
+      );
+    }
+
+    function hasAccessRecord() {
+      return signedIn()
+        && exists(
+          /databases/$(database)/documents/admins/$(request.auth.uid)
+        );
+    }
+
+    function currentRole() {
+      return hasAccessRecord()
+        ? accessRecord().data.role
+        : "community_member";
+    }
+
+    function roleIs(roleName) {
+      return hasAccessRecord()
+        && accessRecord().data.active == true
+        && accessRecord().data.role == roleName;
+    }
+
+    function isAdmin() {
+      return roleIs("admin");
+    }
+
+    function isHR() {
+      return roleIs("hr");
+    }
+
+    function isCommunityManager() {
+      return roleIs("community_manager");
+    }
+
+    function canManage() {
+      return isAdmin()
+        || isHR()
+        || isCommunityManager();
+    }
+
+    /* =========================================================
+       ADMINS / ACCESS DIRECTORY
+       IMPORTANT:
+       The browser must NEVER create or edit access records.
+       Create them manually from Firebase Console.
+       ========================================================= */
+
+    match /admins/{userId} {
+
+      allow read:
+        if signedIn()
+        && request.auth.uid == userId;
+
+      allow create, update, delete:
+        if false;
+    }
+
+    /* =========================================================
+       USER PROFILES
+       ========================================================= */
+
+    match /users/{userId} {
+
+      allow read:
+        if signedIn()
+        && (
+          request.auth.uid == userId
+          || canManage()
+        );
+
+      allow create:
+        if signedIn()
+        && request.auth.uid == userId
+        && request.resource.data.role == "community_member";
+
+      allow update:
+        if signedIn()
+        && (
+          canManage()
+          ||
+          (
+            request.auth.uid == userId
+            && request.resource.data.role ==
+              resource.data.role
+          )
+        );
+
+      allow delete:
+        if signedIn()
+        && (
+          request.auth.uid == userId
+          || isAdmin()
+        );
+    }
+
+    /* =========================================================
+       REQUESTS
+       ========================================================= */
+
+    match /requests/{requestId} {
+
+      allow create:
+        if signedIn()
+        && request.resource.data.userId ==
+          request.auth.uid
+        && request.resource.data.status ==
+          "pending";
+
+      allow read:
+        if signedIn()
+        && (
+          canManage()
+          || resource.data.userId ==
+             request.auth.uid
+        );
+
+      allow update:
+        if signedIn()
+        && (
+          canManage()
+          ||
+          (
+            resource.data.userId ==
+              request.auth.uid
+            && request.resource.data.userId ==
+              resource.data.userId
+            && request.resource.data.status ==
+              resource.data.status
+          )
+        );
+
+      allow delete:
+        if isAdmin();
+    }
+
+    /* =========================================================
+       MESSAGES
+       ========================================================= */
+
+    match /messages/{messageId} {
+
+      allow create:
+        if signedIn()
+        && request.resource.data.senderId ==
+           request.auth.uid;
+
+      allow read:
+        if signedIn()
+        && (
+          canManage()
+          ||
+          resource.data.senderId ==
+            request.auth.uid
+          ||
+          resource.data.recipientId ==
+            request.auth.uid
+        );
+
+      allow update:
+        if signedIn()
+        && (
+          canManage()
+          ||
+          resource.data.senderId ==
+            request.auth.uid
+          ||
+          resource.data.recipientId ==
+            request.auth.uid
+        );
+
+      allow delete:
+        if isAdmin();
+    }
+
+    /* =========================================================
+       EVENTS
+       ========================================================= */
+
+    match /events/{eventId} {
+
+      allow read:
+        if signedIn();
+
+      allow create, update, delete:
+        if canManage();
+    }
+
+    /* =========================================================
+       PROJECTS
+       ========================================================= */
+
+    match /projects/{projectId} {
+
+      allow read:
+        if signedIn();
+
+      allow create, update, delete:
+        if canManage();
+    }
+
+    /* =========================================================
+       COMMUNITY
+       ========================================================= */
+
+    match /community/{memberId} {
+
+      allow read:
+        if signedIn();
+
+      allow create, update, delete:
+        if canManage();
+    }
+
+    /* =========================================================
+       CERTIFICATES
+       ========================================================= */
+
+    match /certificates/{certificateId} {
+
+      allow read:
+        if signedIn();
+
+      allow create, update, delete:
+        if canManage();
+    }
+
+    /* =========================================================
+       NOTIFICATIONS
+       ========================================================= */
+
+    match /notifications/{notificationId} {
+
+      allow read:
+        if signedIn()
+        && (
+          canManage()
+          || resource.data.userId ==
+             request.auth.uid
+        );
+
+      allow create, update, delete:
+        if canManage();
+    }
+  }
+}
